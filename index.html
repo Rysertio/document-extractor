@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="mammoth.browser.min.js"></script>
+    <script src="pdf.js"></script>
+</head>
+<body>
+    <input type="file" id="fileInput">
+    <button onclick="parseFile()">Parse File</button>
+    <a id="downloadLink" style="display: none;" download="parsed_text.txt">Download Text</a>
+    <div id="output"></div>
+
+    <script>
+        async function parseFile() {
+            const fileInput = document.getElementById("fileInput");
+            const outputElement = document.getElementById("output");
+            const downloadLink = document.getElementById("downloadLink");
+            
+            if (fileInput.files.length === 0) {
+                outputElement.innerHTML = "Please select a file.";
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const fileReader = new FileReader();
+
+            fileReader.onload = async function(event) {
+                const arrayBuffer = event.target.result;
+                let result = "";
+
+                if (file.name.endsWith(".docx") || file.name.endsWith(".pptx")) {
+                    const mammothResult = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                    result = mammothResult.value;
+                } else if (file.name.endsWith(".pdf")) {
+                    const pdfData = new Uint8Array(arrayBuffer);
+                    const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                    const numPages = pdfDoc.numPages;
+                    let pdfText = "";
+                    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                        const page = await pdfDoc.getPage(pageNum);
+                        const textContent = await page.getTextContent();
+                        textContent.items.forEach(item => {
+                            pdfText += item.str + " ";
+                        });
+                    }
+                    result = pdfText;
+                } else {
+                    result = "Unsupported file format";
+                }
+
+                outputElement.textContent = result;
+
+                // Enable and set the download link
+                downloadLink.style.display = "block";
+                downloadLink.href = "data:text/plain;charset=utf-8," + encodeURIComponent(result);
+            };
+
+            fileReader.readAsArrayBuffer(file);
+        }
+    </script>
+    <script src="eruda.js"></script>
+    <script>eruda.init();</script>
+</body>
+</html>
